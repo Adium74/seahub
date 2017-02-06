@@ -1834,44 +1834,51 @@ def batch_add_user(request):
                 continue
 
             username = row[0].strip()
-            password = row[1].strip()
+            if not is_valid_username(username):
+                continue
 
-            # nickname & department are optional
+            password = row[1].strip()
+            if password == '':
+                continue
+
+            # nickname is optional
             try:
                 nickname = row[2].strip()
             except IndexError:
                 nickname = ''
 
+            if nickname:
+                if len(nickname) > 64 or '/' in nickname:
+                    continue
+
+            # department is optional
             try:
                 department = row[3].strip()
             except IndexError:
                 department = ''
 
-            if not is_valid_username(username):
-                continue
-
-            if password == '':
-                continue
-
-            if nickname:
-                if len(nickname) > 64 or '/' in nickname:
-                    continue
-
             if department:
                 if len(department) > 512:
                     continue
 
+            # role is optional
+            try:
+                role = row[4].strip()
+            except IndexError:
+                role = ''
+
+            if role:
+                if not is_pro_version():
+                    continue
+
+                if role not in get_available_roles():
+                    continue
+
             try:
                 User.objects.get(email=username)
-                continue
             except User.DoesNotExist:
                 User.objects.create_user(username, password, is_staff=False,
                                          is_active=True)
-
-                if nickname:
-                    Profile.objects.add_or_update(username, nickname, '')
-                if department:
-                    DetailedProfile.objects.add_or_update(username, department, '')
 
                 send_html_email_with_dj_template(
                     username, dj_template='sysadmin/user_batch_add_email.html',
@@ -1881,6 +1888,15 @@ def batch_add_user(request):
                         'email': username,
                         'password': password,
                     })
+
+            if nickname:
+                Profile.objects.add_or_update(username, nickname, '')
+
+            if department:
+                DetailedProfile.objects.add_or_update(username, department, '')
+
+            if role:
+                User.objects.update_role(username, role)
 
         messages.success(request, _('Import succeeded'))
     else:
