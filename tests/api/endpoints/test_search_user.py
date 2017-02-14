@@ -161,6 +161,10 @@ class SearchUserTest(BaseTestCase):
 
         mock_can_use_global_address_book.return_value = False
 
+        p = Profile.objects.add_or_update(self.admin.username, nickname='')
+        p.contact_email = self.admin.username
+        p.save()
+
         resp = self.client.get(self.endpoint + '?q=%s' % self.admin.username)
         json_resp = json.loads(resp.content)
 

@@ -76,7 +76,7 @@ class SearchUser(APIView):
                 else:
                     # in cloud mode, user will be added to Contact when share repo
                     # search user from user's contacts
-                    email_list += search_user_from_contact(request, q)
+                    email_list += search_user_when_global_address_book_disabled(request, q)
             else:
                 # not CLOUD_MODE
                 # search from ccnet
@@ -88,13 +88,9 @@ class SearchUser(APIView):
             # if current user can NOT use global address book,
             # he/she can also search `q` from Contact,
             # search user from user's contacts
-            email_list += search_user_from_contact(request, q)
+            email_list += search_user_when_global_address_book_disabled(request, q)
 
         ## search finished
-        # check if `q` is a valid email
-        if is_valid_email(q):
-            email_list.append(q)
-
         # remove duplicate emails
         email_list = {}.fromkeys(email_list).keys()
 
@@ -198,23 +194,29 @@ def search_user_from_profile(q, limited_emails=[]):
 
     return email_list
 
-def search_user_from_contact(request, q):
+def search_user_when_global_address_book_disabled(request, q):
 
-    # get user's contact list
-    username = request.user.username
-    contacts = Contact.objects.get_contacts_by_user(username)
-
-    # search user from contact list
     email_list = []
+    username = request.user.username
+
+    # search from contact
+    # get user's contact list
+    contacts = Contact.objects.get_contacts_by_user(username)
     for contact in contacts:
+        # search user from contact list
         if q in contact.contact_email:
             email_list.append(contact.contact_email)
 
-    # search from profile, limit search range in user contacts
-    limited_emails = []
-    for contact in contacts:
-        limited_emails.append(contact.contact_email)
+    # search from profile
+    if is_valid_email(q):
+        # if `q` is a valid email
+        # search by `contact_email` from ALL user's profile
+        email_list += search_user_from_profile(q)
+    else:
+        limited_emails = []
+        for contact in contacts:
+            limited_emails.append(contact.contact_email)
 
-    email_list += search_user_from_profile(q, limited_emails)
+        email_list += search_user_from_profile(q, limited_emails)
 
     return email_list
